@@ -17,7 +17,7 @@ svg_content = """
 </svg>
 """
 # Encode the SVG content to base64 for use as a data URI
-FUTURISTIC_HEART_DATA_URI = f"data:image/svg+xml;base64,{base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')}"
+FUTURISTIC_HEART_DATA_URI = "https://raw.githubusercontent.com/Kennt96/capstone-stroke-predictor-app/main/futuristic_heart_1.jpg"
 
 # --- Configuration for the Streamlit App ---
 st.set_page_config(
