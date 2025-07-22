@@ -3,25 +3,26 @@ import pandas as pd
 import joblib
 import numpy as np
 
+# --- Public URL for a Heart Image ---
+# This is a simple, publicly available SVG heart icon from Wikimedia Commons.
+# If you upload your own image to GitHub, replace this URL with its raw GitHub URL.
+HEART_IMAGE_URL = "https://upload.wikimedia.org/wikipedia/commons/4/42/Love_Heart_SVG.svg"
+
 # --- Configuration for the Streamlit App ---
 st.set_page_config(
     page_title="Stroke Risk Predictor",
-    page_icon="🧠",
+    page_icon=HEART_IMAGE_URL, # Use the image URL for the browser tab icon
     layout="centered",
     initial_sidebar_state="expanded"
 )
 
-# --- Load the Trained Model Pipeline ---
-# Ensure 'stroke_prediction_pipeline.pkl' is in the same directory as this script
-try:
-    pipeline = joblib.load('stroke_prediction_pipeline.pkl')
-except FileNotFoundError:
-    st.error("Error: Model file 'stroke_prediction_pipeline.pkl' not found.")
-    st.info("Please ensure the model was saved correctly from your training script and is in the same directory.")
-    st.stop() # Stop the app if the model cannot be loaded
-
 # --- App Title and Description ---
-st.title("🧠 Stroke Risk Predictor")
+st.title("Stroke Risk Predictor") # Title text
+
+# Display the heart image right below the title
+# You can adjust the 'width' parameter to change its size
+st.image(HEART_IMAGE_URL, width=100) # Displays a larger heart image on the page
+
 st.markdown("""
     This application predicts the likelihood of a patient experiencing a stroke
     based on various health and demographic attributes.
@@ -113,4 +114,3 @@ if st.sidebar.button("Predict Stroke Risk"):
 
 st.write("---")
 st.markdown("Developed using Streamlit and Scikit-learn.")
-
