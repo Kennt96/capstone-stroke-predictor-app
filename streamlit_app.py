@@ -4,17 +4,13 @@ import joblib
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-# --- NEW IMPORTS ADDED HERE ---
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-# --- END NEW IMPORTS ---
+from sklearn.pipeline import Pipeline # Keep Pipeline import as it's part of the loaded model structure
 
 # --- URL for Your GitHub Image ---
-# This is the raw URL for your Heart.jpg on GitHub.
-# Make sure 'Heart.jpg' is pushed to the root of your 'main' branch on GitHub.
 GITHUB_HEART_IMAGE_URL = "https://raw.githubusercontent.com/Kennt96/capstone-stroke-predictor-app/main/Heart.jpg"
 
 # --- Configuration for the Streamlit App ---
@@ -26,32 +22,16 @@ st.set_page_config(
 )
 
 # --- Define Feature Lists (as used in training after VIF) ---
-# These lists should match the features used in your training notebook
-# after any feature selection (like VIF removal of 'bmi').
+# These lists are used to define the structure of the input DataFrame for prediction
+# and to understand which features the preprocessor *was* configured for during training.
+# They are NOT used to re-define the preprocessor in the app.
 numerical_features_for_model = ['age', 'avg_glucose_level'] # Assuming 'bmi' was dropped
 categorical_features_for_model = ['gender', 'hypertension', 'heart_disease', 'ever_married',
                                   'work_type', 'Residence_type', 'smoking_status']
 
-# --- Define the Preprocessor (needed for feature importance extraction) ---
-# This preprocessor definition is crucial for correctly getting feature names
-# after one-hot encoding for the feature importance visualization.
-num_transformer = Pipeline(steps=[
-    ('scaler', StandardScaler())])
-
-cat_transformer = Pipeline(steps=[
-    ('onehot', OneHotEncoder(handle_unknown='ignore'))])
-
-preprocessor = ColumnTransformer(
-    transformers=[
-        ('num', num_transformer, numerical_features_for_model),
-        ('cat', cat_transformer, categorical_features_for_model)
-    ])
-
-
 # --- Load the Trained Model Pipeline ---
 pipeline = None
 try:
-    # Attempt to load the model pipeline from the .pkl file.
     pipeline = joblib.load('stroke_prediction_pipeline.pkl')
     st.success("Model pipeline loaded successfully!")
 except FileNotFoundError:
@@ -150,34 +130,32 @@ with tab2:
     Feature importance helps us understand which patient attributes contribute most to the model's decisions.
     """)
 
-    # --- Feature Importance Logic ---
-    # Get the classifier from the pipeline (assuming Random Forest was the best model)
     classifier = pipeline.named_steps['classifier']
 
     if isinstance(classifier, RandomForestClassifier):
-        # Get feature names after preprocessing
-        preprocessor_step = pipeline.named_steps['preprocessor'] # Renamed to avoid conflict with global 'preprocessor'
+        # Get the preprocessor from the *loaded* pipeline.
+        # This preprocessor is already fitted from when the model was trained and saved.
+        preprocessor_from_pipeline = pipeline.named_steps['preprocessor']
 
-        # This part is crucial for getting the correct feature names after ColumnTransformer
-        # It needs to fit on dummy data to correctly get the transformed feature names
-        # We'll create a dummy DataFrame that mimics the structure of your input data
-        dummy_data = pd.DataFrame([[
-            'Male', 40.0, 0, 0, 'Yes',
-            'Private', 'Urban', 100.0, 25.0, 'never smoked'
-        ]], columns=[
-            'gender', 'age', 'hypertension', 'heart_disease', 'ever_married',
-            'work_type', 'Residence_type', 'avg_glucose_level', 'bmi', 'smoking_status'
-        ])
-        preprocessor_step.fit(dummy_data) # Fit the preprocessor to get feature names
+        # Get feature names after preprocessing directly from the preprocessor in the pipeline.
+        # This should give the exact names and count of features that the classifier was trained on.
+        all_feature_names_transformed = preprocessor_from_pipeline.get_feature_names_out()
 
-        # Get the feature names out from the preprocessor
-        # This includes numerical features and one-hot encoded categorical features
-        all_feature_names_transformed = preprocessor_step.get_feature_names_out()
-
-        # Get feature importances from the Random Forest Classifier
+        # Get feature importances from the Random Forest Classifier.
         importances = classifier.feature_importances_
 
-        # Create a DataFrame for better visualization
+        # --- Debugging check (optional, but good for verification) ---
+        # st.write(f"Length of transformed feature names: {len(all_feature_names_transformed)}")
+        # st.write(f"Length of feature importances: {len(importances)}")
+        # --- End Debugging check ---
+
+        # Crucial check: Ensure the lengths match before creating the DataFrame.
+        if len(all_feature_names_transformed) != len(importances):
+            st.error("Error: Mismatch between number of features and feature importances.")
+            st.error(f"Expected {len(all_feature_names_transformed)} features but got {len(importances)} importances.")
+            st.info("This indicates an issue with how the model was trained or how feature names are being extracted. Please ensure the features used in training exactly match the preprocessor's output.")
+            st.stop() # Stop the app if this critical mismatch occurs
+
         feature_importance_df = pd.DataFrame({
             'Feature': all_feature_names_transformed,
             'Importance': importances
