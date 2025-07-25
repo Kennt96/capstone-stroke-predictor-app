@@ -2,8 +2,15 @@ import streamlit as st
 import pandas as pd
 import joblib
 import numpy as np
-import matplotlib.pyplot as plt # New import for plotting
-import seaborn as sns # New import for plotting
+import matplotlib.pyplot as plt
+import seaborn as sns
+# --- NEW IMPORTS ADDED HERE ---
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+# --- END NEW IMPORTS ---
 
 # --- URL for Your GitHub Image ---
 # This is the raw URL for your Heart.jpg on GitHub.
@@ -18,33 +25,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- Load the Trained Model Pipeline ---
-# This crucial block loads your saved machine learning model.
-# It uses a try-except block for robust error handling during loading.
-pipeline = None # Initialize pipeline to None before attempting to load
-try:
-    # Attempt to load the model pipeline from the .pkl file.
-    # The file 'stroke_prediction_pipeline.pkl' must be in the same directory
-    # as this 'streamlit_app.py' script on the deployed server.
-    pipeline = joblib.load('stroke_prediction_pipeline.pkl')
-    st.success("Model pipeline loaded successfully!") # Display success message if loading is successful
-except FileNotFoundError:
-    # Handle the case where the model file is not found.
-    st.error("Error: Model file 'stroke_prediction_pipeline.pkl' not found.")
-    st.info("Please ensure the model was saved correctly from your training script and is in the same directory as this app.")
-    st.stop() # Stop the app execution if the model file is critical and missing
-except Exception as e:
-    # Catch any other general exceptions that might occur during model loading (e.g., version mismatch).
-    st.error("An unexpected error occurred while loading the model pipeline.")
-    st.error(f"**Detailed Loading Error:** {e}") # Display the exact error for debugging
-    st.info("This often indicates a scikit-learn version mismatch between where the model was saved and where it's being loaded. Ensure your `requirements.txt` specifies the exact scikit-learn version used during model training (e.g., `scikit-learn==1.6.1`).")
-    st.stop() # Stop the app execution if model loading fails
-
-# If 'pipeline' is still None after the try-except block, it means loading failed.
-# This check ensures that the rest of the app doesn't attempt to use a non-existent pipeline.
-if pipeline is None:
-    st.stop()
-
 # --- Define Feature Lists (as used in training after VIF) ---
 # These lists should match the features used in your training notebook
 # after any feature selection (like VIF removal of 'bmi').
@@ -52,10 +32,45 @@ numerical_features_for_model = ['age', 'avg_glucose_level'] # Assuming 'bmi' was
 categorical_features_for_model = ['gender', 'hypertension', 'heart_disease', 'ever_married',
                                   'work_type', 'Residence_type', 'smoking_status']
 
+# --- Define the Preprocessor (needed for feature importance extraction) ---
+# This preprocessor definition is crucial for correctly getting feature names
+# after one-hot encoding for the feature importance visualization.
+num_transformer = Pipeline(steps=[
+    ('scaler', StandardScaler())])
+
+cat_transformer = Pipeline(steps=[
+    ('onehot', OneHotEncoder(handle_unknown='ignore'))])
+
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', num_transformer, numerical_features_for_model),
+        ('cat', cat_transformer, categorical_features_for_model)
+    ])
+
+
+# --- Load the Trained Model Pipeline ---
+pipeline = None
+try:
+    # Attempt to load the model pipeline from the .pkl file.
+    pipeline = joblib.load('stroke_prediction_pipeline.pkl')
+    st.success("Model pipeline loaded successfully!")
+except FileNotFoundError:
+    st.error("Error: Model file 'stroke_prediction_pipeline.pkl' not found.")
+    st.info("Please ensure the model was saved correctly from your training script and is in the same directory as this app.")
+    st.stop()
+except Exception as e:
+    st.error("An unexpected error occurred while loading the model pipeline.")
+    st.error(f"**Detailed Loading Error:** {e}")
+    st.info("This often indicates a scikit-learn version mismatch between where the model was saved and where it's being loaded. Ensure your `requirements.txt` specifies the exact scikit-learn version used during model training (e.g., `scikit-learn==1.6.1`).")
+    st.stop()
+
+if pipeline is None:
+    st.stop()
+
 
 # --- App Title and Description ---
-st.title("Heart Stroke Risk Predictor") # Main title for the application
-st.image(GITHUB_HEART_IMAGE_URL, width=120) # Display the heart image
+st.title("Heart Stroke Risk Predictor")
+st.image(GITHUB_HEART_IMAGE_URL, width=120)
 
 # Create tabs for navigation
 tab1, tab2, tab3 = st.tabs(["Overview", "Most Important Features", "Recommendations"])
@@ -68,57 +83,36 @@ with tab1:
         Please enter the patient's details in the sidebar.
     """)
 
-    st.write("---") # Adds a horizontal rule for visual separation
+    st.write("---")
 
     # --- Sidebar for User Input ---
-    st.sidebar.header("Patient Data Input") # Header for the input section in the sidebar
+    st.sidebar.header("Patient Data Input")
 
-    # Define input widgets for each feature.
-    # Ensure that the options and types for these widgets match the data
-    # that your trained model expects.
-
-    # Gender input: Selectbox with Male/Female options
     gender_options = ['Male', 'Female']
     gender = st.sidebar.selectbox("Gender", gender_options)
 
-    # Age input: Slider for a continuous range of age
     age = st.sidebar.slider("Age (years)", min_value=0.0, max_value=82.0, value=45.0, step=0.1)
 
-    # Hypertension input: Selectbox for binary (0 or 1) choice, displayed as Yes/No
     hypertension = st.sidebar.selectbox("Hypertension", [0, 1], format_func=lambda x: 'Yes' if x == 1 else 'No')
 
-    # Heart Disease input: Selectbox for binary (0 or 1) choice, displayed as Yes/No
     heart_disease = st.sidebar.selectbox("Heart Disease", [0, 1], format_func=lambda x: 'Yes' if x == 1 else 'No')
 
-    # Ever Married input: Selectbox for Yes/No
     ever_married = st.sidebar.selectbox("Ever Married", ['Yes', 'No'])
 
-    # Work Type input: Selectbox for various work categories
     work_type_options = ['Private', 'Self-employed', 'children', 'Govt_job', 'Never_worked']
     work_type = st.sidebar.selectbox("Work Type", work_type_options)
 
-    # Residence Type input: Selectbox for Urban/Rural
     residence_type_options = ['Urban', 'Rural']
     Residence_type = st.sidebar.selectbox("Residence Type", residence_type_options)
 
-    # Average Glucose Level input: Number input for a continuous numerical value
     avg_glucose_level = st.sidebar.number_input("Average Glucose Level", min_value=55.0, max_value=170.0, value=90.0, step=0.1)
 
-    # BMI input: Number input for Body Mass Index
-    # Note: BMI was potentially dropped from the model's features due to VIF in training.
-    # However, it's still a relevant input for user, and the preprocessor handles it.
     bmi = st.sidebar.number_input("BMI (Body Mass Index)", min_value=10.0, max_value=50.0, value=25.0, step=0.1)
 
-    # Smoking Status input: Selectbox for different smoking categories
     smoking_status_options = ['never smoked', 'Unknown', 'formerly smoked', 'smokes']
     smoking_status = st.sidebar.selectbox("Smoking Status", smoking_status_options)
 
     # --- Prediction Logic ---
-    # This section prepares the user's input data and makes a prediction using the loaded model.
-
-    # Create a Pandas DataFrame from the user inputs.
-    # The column names and their order MUST match the features and their order
-    # that your trained 'pipeline' expects.
     input_data_df = pd.DataFrame([[
         gender, age, hypertension, heart_disease, ever_married,
         work_type, Residence_type, avg_glucose_level, bmi, smoking_status
@@ -127,20 +121,15 @@ with tab1:
         'work_type', 'Residence_type', 'avg_glucose_level', 'bmi', 'smoking_status'
     ])
 
-    # Button to trigger the prediction
     if st.sidebar.button("Predict Stroke Risk"):
-        st.write("### Prediction Results:") # Subheader for results
+        st.write("### Prediction Results:")
 
         try:
-            # Get the probability of the patient having a stroke (class 1).
             prediction_proba = pipeline.predict_proba(input_data_df)[:, 1][0]
-            # Get the predicted class (0 for no stroke, 1 for stroke).
             prediction_class = pipeline.predict(input_data_df)[0]
 
-            # Display the predicted probability as a metric.
             st.metric(label="Probability of Stroke", value=f"{prediction_proba * 100:.2f}%")
 
-            # Display a message based on the predicted class.
             if prediction_class == 1:
                 st.error("⚠️ **HIGH RISK OF STROKE**")
                 st.write("Based on the provided information, the model indicates a high likelihood of stroke.")
@@ -149,11 +138,10 @@ with tab1:
                 st.write("Based on the provided information, the model indicates a low likelihood of stroke.")
 
         except Exception as e:
-            # Catch any errors during the prediction process (e.g., incorrect input format).
             st.error(f"An error occurred during prediction. Please check your inputs. Error: {e}")
 
-    st.write("---") # Another horizontal rule
-    st.markdown("Developed using Streamlit and Scikit-learn.") # Footer
+    st.write("---")
+    st.markdown("Developed using Streamlit and Scikit-learn.")
 
 with tab2:
     st.header("Most Important Features")
@@ -168,22 +156,30 @@ with tab2:
 
     if isinstance(classifier, RandomForestClassifier):
         # Get feature names after preprocessing
-        preprocessor = pipeline.named_steps['preprocessor']
+        preprocessor_step = pipeline.named_steps['preprocessor'] # Renamed to avoid conflict with global 'preprocessor'
 
-        # Get one-hot encoded feature names
-        # Access the OneHotEncoder from the 'cat' transformer within the preprocessor
-        onehot_encoder = preprocessor.named_transformers_['cat'].named_steps['onehot']
-        onehot_feature_names = onehot_encoder.get_feature_names_out(categorical_features_for_model)
+        # This part is crucial for getting the correct feature names after ColumnTransformer
+        # It needs to fit on dummy data to correctly get the transformed feature names
+        # We'll create a dummy DataFrame that mimics the structure of your input data
+        dummy_data = pd.DataFrame([[
+            'Male', 40.0, 0, 0, 'Yes',
+            'Private', 'Urban', 100.0, 25.0, 'never smoked'
+        ]], columns=[
+            'gender', 'age', 'hypertension', 'heart_disease', 'ever_married',
+            'work_type', 'Residence_type', 'avg_glucose_level', 'bmi', 'smoking_status'
+        ])
+        preprocessor_step.fit(dummy_data) # Fit the preprocessor to get feature names
 
-        # Combine numerical and one-hot encoded feature names
-        all_feature_names = numerical_features_for_model + list(onehot_feature_names)
+        # Get the feature names out from the preprocessor
+        # This includes numerical features and one-hot encoded categorical features
+        all_feature_names_transformed = preprocessor_step.get_feature_names_out()
 
         # Get feature importances from the Random Forest Classifier
         importances = classifier.feature_importances_
 
         # Create a DataFrame for better visualization
         feature_importance_df = pd.DataFrame({
-            'Feature': all_feature_names,
+            'Feature': all_feature_names_transformed,
             'Importance': importances
         })
 
@@ -191,28 +187,20 @@ with tab2:
         feature_importance_df = feature_importance_df.sort_values(by='Importance', ascending=False)
 
         st.subheader("Top 15 Feature Importances (Table)")
-        st.dataframe(feature_importance_df.head(15), use_container_width=True) # Display top 15 in a dataframe
+        st.dataframe(feature_importance_df.head(15), use_container_width=True)
 
         st.subheader("Top 10 Feature Importances (Chart)")
-        # Create a Matplotlib/Seaborn plot for visualization
         fig, ax = plt.subplots(figsize=(10, 6))
-        sns.barplot(x='Importance', y='Feature', data=feature_importance_df.head(10), ax=ax, palette='viridis') # Plot top 10
+        sns.barplot(x='Importance', y='Feature', data=feature_importance_df.head(10), ax=ax, palette='viridis')
         ax.set_title('Top 10 Feature Importances')
         ax.set_xlabel('Relative Importance (Higher = More Impactful)')
         ax.set_ylabel('Feature')
-        plt.tight_layout() # Adjust layout to prevent labels from overlapping
-        st.pyplot(fig) # Display the plot in Streamlit
-        plt.close(fig) # Close the figure to free up memory and prevent display issues
+        plt.tight_layout()
+        st.pyplot(fig)
+        plt.close(fig)
 
     elif isinstance(classifier, LogisticRegression):
         st.info("The best performing model identified during training was Random Forest. Its feature importances are displayed here. For Logistic Regression, feature importance is typically interpreted from its coefficients, which indicate the strength and direction of a feature's relationship with the log-odds of stroke.")
-        # If Logistic Regression was the best model, you would extract and display coefficients here.
-        # For example:
-        # coefficients = classifier.coef_[0]
-        # feature_importance_lr = pd.DataFrame({'feature': all_feature_names, 'coefficient': coefficients})
-        # feature_importance_lr['abs_coefficient'] = np.abs(feature_importance_lr['coefficient'])
-        # feature_importance_lr = feature_importance_lr.sort_values(by='abs_coefficient', ascending=False)
-        # st.dataframe(feature_importance_lr.head(15))
     else:
         st.warning("Feature importance display is currently configured for Random Forest Classifier, which was the best performing model. The type of classifier in the pipeline is not recognized for feature importance display.")
 
