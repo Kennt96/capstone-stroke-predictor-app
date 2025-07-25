@@ -4,11 +4,6 @@ import joblib
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline # Keep Pipeline import as it's part of the loaded model structure
 
 # --- URL for Your GitHub Image ---
 GITHUB_HEART_IMAGE_URL = "https://raw.githubusercontent.com/Kennt96/capstone-stroke-predictor-app/main/Heart.jpg"
@@ -20,14 +15,6 @@ st.set_page_config(
     layout="centered",
     initial_sidebar_state="expanded"
 )
-
-# --- Define Feature Lists (as used in training after VIF) ---
-# These lists are used to define the structure of the input DataFrame for prediction
-# and to understand which features the preprocessor *was* configured for during training.
-# They are NOT used to re-define the preprocessor in the app.
-numerical_features_for_model = ['age', 'avg_glucose_level'] # Assuming 'bmi' was dropped
-categorical_features_for_model = ['gender', 'hypertension', 'heart_disease', 'ever_married',
-                                  'work_type', 'Residence_type', 'smoking_status']
 
 # --- Load the Trained Model Pipeline ---
 pipeline = None
@@ -47,16 +34,21 @@ except Exception as e:
 if pipeline is None:
     st.stop()
 
+# --- Define Feature Lists (as used in training after VIF) ---
+numerical_features_for_model = ['age', 'avg_glucose_level']
+categorical_features_for_model = ['gender', 'hypertension', 'heart_disease', 'ever_married',
+                                  'work_type', 'Residence_type', 'smoking_status']
+
 
 # --- App Title and Description ---
-st.title("Heart Stroke Risk Predictor")
+st.title("Heart Stroke Risk Predictor") # Already bold by default
 st.image(GITHUB_HEART_IMAGE_URL, width=120)
 
 # Create tabs for navigation
 tab1, tab2, tab3 = st.tabs(["Overview", "Most Important Features", "Recommendations"])
 
 with tab1:
-    st.header("Overview")
+    st.markdown("### **Overview**") # <--- CHANGED HERE for bold
     st.markdown("""
         This application predicts the likelihood of a patient experiencing a stroke
         based on various health and demographic attributes.
@@ -66,8 +58,9 @@ with tab1:
     st.write("---")
 
     # --- Sidebar for User Input ---
-    st.sidebar.header("Patient Data Input")
+    st.sidebar.markdown("### **Patient Data Input**") # <--- CHANGED HERE for bold
 
+    # Define input widgets for each feature
     gender_options = ['Male', 'Female']
     gender = st.sidebar.selectbox("Gender", gender_options)
 
@@ -101,8 +94,9 @@ with tab1:
         'work_type', 'Residence_type', 'avg_glucose_level', 'bmi', 'smoking_status'
     ])
 
+    # Button to trigger the prediction
     if st.sidebar.button("Predict Stroke Risk"):
-        st.write("### Prediction Results:")
+        st.markdown("### **Prediction Results:**") # <--- CHANGED HERE for bold
 
         try:
             prediction_proba = pipeline.predict_proba(input_data_df)[:, 1][0]
@@ -124,7 +118,7 @@ with tab1:
     st.markdown("Developed using Streamlit and Scikit-learn.")
 
 with tab2:
-    st.header("Most Important Features")
+    st.markdown("### **Most Important Features**") # <--- CHANGED HERE for bold
     st.markdown("""
     This section highlights the features that the model found most influential in predicting stroke risk.
     Feature importance helps us understand which patient attributes contribute most to the model's decisions.
@@ -133,41 +127,22 @@ with tab2:
     classifier = pipeline.named_steps['classifier']
 
     if isinstance(classifier, RandomForestClassifier):
-        # Get the preprocessor from the *loaded* pipeline.
-        # This preprocessor is already fitted from when the model was trained and saved.
-        preprocessor_from_pipeline = pipeline.named_steps['preprocessor']
-
-        # Get feature names after preprocessing directly from the preprocessor in the pipeline.
-        # This should give the exact names and count of features that the classifier was trained on.
-        all_feature_names_transformed = preprocessor_from_pipeline.get_feature_names_out()
-
-        # Get feature importances from the Random Forest Classifier.
+        preprocessor = pipeline.named_steps['preprocessor']
+        onehot_encoder = preprocessor.named_transformers_['cat'].named_steps['onehot']
+        onehot_feature_names = onehot_encoder.get_feature_names_out(categorical_features_for_model)
+        all_feature_names = numerical_features_for_model + list(onehot_feature_names)
         importances = classifier.feature_importances_
 
-        # --- Debugging check (optional, but good for verification) ---
-        # st.write(f"Length of transformed feature names: {len(all_feature_names_transformed)}")
-        # st.write(f"Length of feature importances: {len(importances)}")
-        # --- End Debugging check ---
-
-        # Crucial check: Ensure the lengths match before creating the DataFrame.
-        if len(all_feature_names_transformed) != len(importances):
-            st.error("Error: Mismatch between number of features and feature importances.")
-            st.error(f"Expected {len(all_feature_names_transformed)} features but got {len(importances)} importances.")
-            st.info("This indicates an issue with how the model was trained or how feature names are being extracted. Please ensure the features used in training exactly match the preprocessor's output.")
-            st.stop() # Stop the app if this critical mismatch occurs
-
         feature_importance_df = pd.DataFrame({
-            'Feature': all_feature_names_transformed,
+            'Feature': all_feature_names,
             'Importance': importances
         })
-
-        # Sort by importance in descending order
         feature_importance_df = feature_importance_df.sort_values(by='Importance', ascending=False)
 
-        st.subheader("Top 15 Feature Importances (Table)")
+        st.markdown("#### **Top 15 Feature Importances (Table)**") # <--- CHANGED HERE for bold
         st.dataframe(feature_importance_df.head(15), use_container_width=True)
 
-        st.subheader("Top 10 Feature Importances (Chart)")
+        st.markdown("#### **Top 10 Feature Importances (Chart)**") # <--- CHANGED HERE for bold
         fig, ax = plt.subplots(figsize=(10, 6))
         sns.barplot(x='Importance', y='Feature', data=feature_importance_df.head(10), ax=ax, palette='viridis')
         ax.set_title('Top 10 Feature Importances')
@@ -184,7 +159,7 @@ with tab2:
 
 
 with tab3:
-    st.header("Recommendations for Heart Stroke Prevention")
+    st.markdown("### **Recommendations for Heart Stroke Prevention**") # <--- CHANGED HERE for bold
     st.markdown("""
     Based on general medical guidelines and common risk factors for stroke, here are some recommendations to help reduce the risk of heart stroke:
 
