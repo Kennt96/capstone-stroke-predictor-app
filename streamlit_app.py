@@ -4,6 +4,8 @@ import joblib
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.ensemble import RandomForestClassifier # <--- NEW IMPORT ADDED HERE
+from sklearn.linear_model import LogisticRegression # <--- ADDED THIS TOO for completeness if you ever switch
 
 # --- URL for Your GitHub Image ---
 GITHUB_HEART_IMAGE_URL = "https://raw.githubusercontent.com/Kennt96/capstone-stroke-predictor-app/main/Heart.jpg"
@@ -41,14 +43,14 @@ categorical_features_for_model = ['gender', 'hypertension', 'heart_disease', 'ev
 
 
 # --- App Title and Description ---
-st.title("Heart Stroke Risk Predictor") # Already bold by default
+st.title("Heart Stroke Risk Predictor")
 st.image(GITHUB_HEART_IMAGE_URL, width=120)
 
 # Create tabs for navigation
 tab1, tab2, tab3 = st.tabs(["Overview", "Most Important Features", "Recommendations"])
 
 with tab1:
-    st.markdown("### **Overview**") # <--- CHANGED HERE for bold
+    st.markdown("### **Overview**")
     st.markdown("""
         This application predicts the likelihood of a patient experiencing a stroke
         based on various health and demographic attributes.
@@ -58,7 +60,7 @@ with tab1:
     st.write("---")
 
     # --- Sidebar for User Input ---
-    st.sidebar.markdown("### **Patient Data Input**") # <--- CHANGED HERE for bold
+    st.sidebar.markdown("### **Patient Data Input**")
 
     # Define input widgets for each feature
     gender_options = ['Male', 'Female']
@@ -96,7 +98,7 @@ with tab1:
 
     # Button to trigger the prediction
     if st.sidebar.button("Predict Stroke Risk"):
-        st.markdown("### **Prediction Results:**") # <--- CHANGED HERE for bold
+        st.markdown("### **Prediction Results:**")
 
         try:
             prediction_proba = pipeline.predict_proba(input_data_df)[:, 1][0]
@@ -118,7 +120,7 @@ with tab1:
     st.markdown("Developed using Streamlit and Scikit-learn.")
 
 with tab2:
-    st.markdown("### **Most Important Features**") # <--- CHANGED HERE for bold
+    st.markdown("### **Most Important Features**")
     st.markdown("""
     This section highlights the features that the model found most influential in predicting stroke risk.
     Feature importance helps us understand which patient attributes contribute most to the model's decisions.
@@ -128,21 +130,29 @@ with tab2:
 
     if isinstance(classifier, RandomForestClassifier):
         preprocessor = pipeline.named_steps['preprocessor']
+        # Access the OneHotEncoder from the 'cat' transformer within the preprocessor
         onehot_encoder = preprocessor.named_transformers_['cat'].named_steps['onehot']
         onehot_feature_names = onehot_encoder.get_feature_names_out(categorical_features_for_model)
+
+        # Combine numerical and one-hot encoded feature names
         all_feature_names = numerical_features_for_model + list(onehot_feature_names)
+
+        # Get feature importances from the Random Forest Classifier
         importances = classifier.feature_importances_
 
+        # Create a DataFrame for better visualization
         feature_importance_df = pd.DataFrame({
             'Feature': all_feature_names,
             'Importance': importances
         })
+
+        # Sort by importance in descending order
         feature_importance_df = feature_importance_df.sort_values(by='Importance', ascending=False)
 
-        st.markdown("#### **Top 15 Feature Importances (Table)**") # <--- CHANGED HERE for bold
+        st.markdown("#### **Top 15 Feature Importances (Table)**")
         st.dataframe(feature_importance_df.head(15), use_container_width=True)
 
-        st.markdown("#### **Top 10 Feature Importances (Chart)**") # <--- CHANGED HERE for bold
+        st.markdown("#### **Top 10 Feature Importances (Chart)**")
         fig, ax = plt.subplots(figsize=(10, 6))
         sns.barplot(x='Importance', y='Feature', data=feature_importance_df.head(10), ax=ax, palette='viridis')
         ax.set_title('Top 10 Feature Importances')
@@ -159,7 +169,7 @@ with tab2:
 
 
 with tab3:
-    st.markdown("### **Recommendations for Heart Stroke Prevention**") # <--- CHANGED HERE for bold
+    st.markdown("### **Recommendations for Heart Stroke Prevention**")
     st.markdown("""
     Based on general medical guidelines and common risk factors for stroke, here are some recommendations to help reduce the risk of heart stroke:
 
